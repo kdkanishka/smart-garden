@@ -1,0 +1,25 @@
+{
+  "referenceTime": "2026-10-27T06:00:00Z",
+  "timeSeries": [
+    {
+      "intervalParametersStartTime": "2026-10-27T06:00:00Z",
+      "time": "2026-10-27T12:00:00Z",
+      "data": {"precipitation_amount_mean": 1.2}
+    },
+    {
+      "intervalParametersStartTime": "2026-10-27T12:00:00Z",
+      "time": "2026-10-28T00:00:00Z",
+      "data": {"precipitation_amount_mean": 2.4}
+    },
+    {
+      "intervalParametersStartTime": "2026-10-28T00:00:00Z",
+      "time": "2026-10-29T00:00:00Z",
+      "data": {"precipitation_amount_mean": 4.8}
+    },
+    {
+      "intervalParametersStartTime": "2026-10-29T00:00:00Z",
+      "time": "2026-10-29T12:00:00Z",
+      "data": {"precipitation_amount_mean": 2.4}
+    }
+  ]
+}

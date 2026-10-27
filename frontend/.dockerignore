@@ -1,0 +1,21 @@
+# Allow only runtime assets and the nginx template into the build context.
+**
+!index.html
+!app.js
+!style.css
+!nginx.conf
+!vendor/
+vendor/**
+!vendor/leaflet.js
+!vendor/leaflet.js.map
+!vendor/leaflet.css
+!vendor/LICENSE
+!vendor/images/
+vendor/images/**
+!vendor/images/*.png
+**/.*
+**/*.pem
+**/*.key
+**/*.tmp
+**/*~
+vendor/VERSION

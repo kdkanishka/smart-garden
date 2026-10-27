@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Smart Garden Monitor</title>
+  <link rel="stylesheet" href="vendor/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="vendor/leaflet.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="page-header">
+    <p class="eyebrow">Watering Assistant For Your Gardens</p>
+    <h1>Smart Garden Monitor</h1>
+    <p>Save your plants and see forecast-based watering advice for their locations.</p>
+  </header>
+  <main>
+    <section class="panel" aria-labelledby="form-title">
+      <h2 id="form-title">Add a plant</h2>
+      <form id="plant-form" novalidate>
+        <fieldset id="plant-fields">
+          <label for="plant-name">Plant name</label>
+          <input id="plant-name" name="name" type="text" maxlength="100" required
+                 autocomplete="off" placeholder="For example, balcony tomatoes">
+          <p id="map-help">Click the map to select a location. Keyboard: focus the map, use arrow keys to pan, then Enter to select its centre.</p>
+          <div id="map" role="region" aria-label="Plant location map" aria-describedby="map-help selected-location"></div>
+          <p id="map-status" class="muted" role="status"></p>
+          <p id="selected-location" class="selection" role="status">No location selected.</p>
+          <div class="actions">
+            <button id="save-plant" type="submit">Add plant</button>
+            <button id="cancel-edit" class="secondary" type="button" hidden>Cancel edit</button>
+          </div>
+        </fieldset>
+      </form>
+      <p id="form-status" role="status" aria-live="polite"></p>
+      <p id="form-error" class="error" role="alert"></p>
+    </section>
+    <section class="panel" aria-labelledby="plants-title">
+      <div class="section-heading">
+        <h2 id="plants-title">Your plants</h2>
+        <button id="refresh-plants" type="button" class="secondary">Refresh plants</button>
+      </div>
+      <p class="muted">A shared garden. Advice uses expected precipitation, including snow as water equivalent.</p>
+      <p id="list-status" role="status" aria-live="polite"></p>
+      <p id="list-error" class="error" role="alert"></p>
+      <ul id="plant-list" class="plant-list" aria-label="Saved plants"></ul>
+    </section>
+  </main>
+  <footer>Forecast advice is a simple guide; check your plants and soil before watering.</footer>
+  <noscript><p class="error">Please enable JavaScript to use the map and manage plants.</p></noscript>
+</body>
+</html>

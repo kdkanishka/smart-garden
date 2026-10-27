@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: garden-config
+  labels:
+    app.kubernetes.io/part-of: smart-garden
+data:
+  POSTGRES_DB: smart_garden
+  WEATHER_SERVICE_URL: http://weather-analyzer-svc:80
+  WATERING_THRESHOLD_MM: "5.0"
+  WEATHER_CACHE_TTL_SECONDS: "300"
+  WEATHER_CACHE_MAX_ENTRIES: "1000"
+  SMHI_TIMEOUT_SECONDS: "10"
+  WEATHER_TIMEOUT_SECONDS: "12"
+  WEATHER_MAX_CONCURRENCY: "5"
+  WEATHER_ENRICHMENT_TIMEOUT_SECONDS: "45"

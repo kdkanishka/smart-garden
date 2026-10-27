@@ -1,0 +1,25 @@
+# Allow only application modules, dependencies, and migration runtime files.
+**
+!requirements.txt
+!main.py
+!database.py
+!models.py
+!schemas.py
+!crud.py
+!weather_client.py
+!alembic.ini
+!migrations/
+migrations/**
+!migrations/env.py
+!migrations/script.py.mako
+!migrations/versions/
+migrations/versions/**
+!migrations/versions/*.py
+**/__pycache__/
+**/*.py[cod]
+**/.*
+**/*.md
+**/*.pem
+**/*.key
+**/*.tmp
+**/*~

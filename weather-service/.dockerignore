@@ -1,0 +1,7 @@
+# Allow only application modules and runtime dependencies.
+**
+!requirements.txt
+!main.py
+!smhi_client.py
+!forecast.py
+!weather.py

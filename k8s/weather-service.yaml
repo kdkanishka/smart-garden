@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weather-analyzer
+  labels:
+    app: weather-analyzer
+    app.kubernetes.io/part-of: smart-garden
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: weather-analyzer
+  template:
+    metadata:
+      labels:
+        app: weather-analyzer
+        app.kubernetes.io/part-of: smart-garden
+    spec:
+      containers:
+        - name: weather-analyzer
+          image: kdkanishka/weather-analyzer:v1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: garden-config
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 24
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: weather-analyzer-svc
+  labels:
+    app: weather-analyzer
+    app.kubernetes.io/part-of: smart-garden
+spec:
+  type: ClusterIP
+  selector:
+    app: weather-analyzer
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
