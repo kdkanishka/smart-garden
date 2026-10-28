@@ -10,6 +10,7 @@ from pydantic import ValidationError
 import pytest
 
 import main
+from auth import current_user
 from database import Settings, get_session
 from models import Plant
 from schemas import WeatherResponse
@@ -36,7 +37,7 @@ def plant(plant_id=1, lat="57.7", lon="11.9"):
 
 
 @pytest.fixture
-def api_factory(monkeypatch):
+def api_factory(monkeypatch, public_key):
     engine = Mock(dispose=AsyncMock())
     monkeypatch.setattr(main, "create_database", Mock(return_value=engine))
     monkeypatch.setattr(main, "create_session_factory", Mock(return_value=Mock()))
@@ -44,7 +45,7 @@ def api_factory(monkeypatch):
     @contextmanager
     def factory(handler, **settings):
         app = main.create_app(
-            Settings(database_url=DATABASE_URL, **settings),
+            Settings(database_url=DATABASE_URL, jwt_public_key=public_key, **settings),
             transport=httpx.MockTransport(handler),
         )
 
@@ -52,6 +53,7 @@ def api_factory(monkeypatch):
             yield object()
 
         app.dependency_overrides[get_session] = session
+        app.dependency_overrides[current_user] = lambda: "demo-user-1"
         with TestClient(app) as client:
             yield client
         assert app.state.weather_client is None

@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: garden-service
-          image: kdkanishka/garden-service:v1
+          image: kdkanishka/garden-service:v2
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -27,6 +27,11 @@ spec:
             - configMapRef:
                 name: garden-config
           env:
+            - name: JWT_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: garden-auth-keys
+                  key: public.pem
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

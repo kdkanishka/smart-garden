@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && groupadd --gid 10001 app \
     && useradd --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app
 
-COPY main.py database.py models.py schemas.py crud.py weather_client.py alembic.ini ./
+COPY main.py auth.py database.py models.py schemas.py crud.py weather_client.py alembic.ini ./
 COPY migrations/ ./migrations/
 
 USER 10001:10001

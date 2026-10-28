@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: kdkanishka/garden-frontend:v1
+          image: kdkanishka/garden-frontend:v2
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -28,6 +28,10 @@ spec:
               # Nginx's runtime resolver does not expand DNS search suffixes.
               value: garden-service-svc.default.svc.cluster.local
             - name: GARDEN_SERVICE_PORT
+              value: "80"
+            - name: AUTH_SERVICE_HOST
+              value: auth-service-svc.default.svc.cluster.local
+            - name: AUTH_SERVICE_PORT
               value: "80"
             - name: NGINX_ENTRYPOINT_LOCAL_RESOLVERS
               value: "1"

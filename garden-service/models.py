@@ -22,6 +22,7 @@ class Plant(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     lat: Mapped[Decimal] = mapped_column(Numeric(8, 6), nullable=False)
     lon: Mapped[Decimal] = mapped_column(Numeric(9, 6), nullable=False)

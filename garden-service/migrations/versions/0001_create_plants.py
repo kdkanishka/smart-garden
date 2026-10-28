@@ -14,6 +14,7 @@ def upgrade():
     op.create_table(
         "plants",
         sa.Column("id", sa.Integer(), primary_key=True, nullable=False),
+        sa.Column("owner_id", sa.String(100), nullable=False),
         sa.Column("name", sa.String(100), nullable=False),
         sa.Column("lat", sa.Numeric(8, 6), nullable=False),
         sa.Column("lon", sa.Numeric(9, 6), nullable=False),
@@ -26,6 +27,7 @@ def upgrade():
             "AND name ~ '[^[:space:]]'", name="ck_plants_name",
         ),
     )
+    op.create_index("ix_plants_owner_id", "plants", ["owner_id"])
 
 
 def downgrade():

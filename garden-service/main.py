@@ -9,10 +9,13 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import httpx
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from sqlalchemy.exc import DBAPIError, TimeoutError as DatabaseTimeout
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import crud
+from auth import CurrentUser
 from database import Settings, check_schema, create_database, create_session_factory, get_session
 from schemas import EnrichedPlantResponse, PlantCreate, PlantPatch, PlantResponse
 from weather_client import WeatherClient, enrich_plants
@@ -27,6 +30,10 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         config = settings if settings is not None else Settings.from_env()
+        public_key = serialization.load_pem_public_key(config.jwt_public_key.encode())
+        if not isinstance(public_key, rsa.RSAPublicKey) or public_key.key_size < 2048:
+            raise ValueError("JWT_PUBLIC_KEY must be an RSA public key of at least 2048 bits")
+        app.state.auth_settings = config
         engine = create_database(config)
         app.state.session_factory = create_session_factory(engine)
         try:
@@ -73,8 +80,8 @@ def create_app(
         return {"status": "ok"}
 
     @app.post("/plants", response_model=PlantResponse, status_code=201)
-    async def create(data: PlantCreate, session: Session):
-        return await crud.create_plant(session, data)
+    async def create(data: PlantCreate, user: CurrentUser, session: Session):
+        return await crud.create_plant(session, data, user)
 
     async def enrich(request: Request, plants):
         return await enrich_plants(
@@ -84,26 +91,26 @@ def create_app(
         )
 
     @app.get("/plants", response_model=list[EnrichedPlantResponse])
-    async def list_all(request: Request, session: Session):
-        return await enrich(request, await crud.list_plants(session))
+    async def list_all(request: Request, user: CurrentUser, session: Session):
+        return await enrich(request, await crud.list_plants(session, user))
 
     @app.get("/plants/{plant_id}", response_model=EnrichedPlantResponse)
-    async def get(plant_id: int, request: Request, session: Session):
-        plant = await crud.get_plant(session, plant_id)
+    async def get(plant_id: int, request: Request, user: CurrentUser, session: Session):
+        plant = await crud.get_plant(session, plant_id, user)
         if plant is None:
             raise HTTPException(404, "Plant not found")
         return (await enrich(request, [plant]))[0]
 
     @app.patch("/plants/{plant_id}", response_model=PlantResponse)
-    async def patch(plant_id: int, data: PlantPatch, session: Session):
-        plant = await crud.update_plant(session, plant_id, data)
+    async def patch(plant_id: int, data: PlantPatch, user: CurrentUser, session: Session):
+        plant = await crud.update_plant(session, plant_id, data, user)
         if plant is None:
             raise HTTPException(404, "Plant not found")
         return plant
 
     @app.delete("/plants/{plant_id}", status_code=204, response_class=Response)
-    async def delete(plant_id: int, session: Session):
-        if not await crud.delete_plant(session, plant_id):
+    async def delete(plant_id: int, user: CurrentUser, session: Session):
+        if not await crud.delete_plant(session, plant_id, user):
             raise HTTPException(404, "Plant not found")
         return Response(status_code=204)
 

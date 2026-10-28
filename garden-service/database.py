@@ -22,6 +22,9 @@ class Settings(BaseModel):
     model_config = ConfigDict(frozen=True, allow_inf_nan=False, validate_default=True)
 
     database_url: str
+    jwt_public_key: str = ""
+    jwt_issuer: str = "smart-garden-auth"
+    jwt_audience: str = "smart-garden"
     weather_service_url: AnyHttpUrl = "http://weather-analyzer-svc:80"
     weather_timeout_seconds: float = Field(default=12, gt=0)
     weather_max_concurrency: int = Field(default=5, gt=0, le=5)

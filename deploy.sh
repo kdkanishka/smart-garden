@@ -14,7 +14,7 @@ ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 K8S_DIR="$ROOT_DIR/k8s"
 KUBECTL=(kubectl --context=minikube --namespace=default)
 
-for command in minikube kubectl; do
+for command in minikube kubectl openssl; do
     if ! command -v "$command" >/dev/null 2>&1; then
         printf 'Required command not found: %s\n' "$command" >&2
         exit 1
@@ -41,6 +41,15 @@ minikube start --profile=minikube --cpus=4 --memory=4096
 printf 'Applying configuration and starting PostgreSQL...\n'
 "${KUBECTL[@]}" apply -f "$K8S_DIR/configmap.yaml"
 "${KUBECTL[@]}" apply -f "$K8S_DIR/secret.yaml"
+if [[ -z "$("${KUBECTL[@]}" get secret garden-auth-keys --ignore-not-found=true -o name)" ]]; then
+    printf 'Generating JWT signing keys...\n'
+    private_key="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null)"
+    public_key="$(openssl pkey -pubout <<< "$private_key")"
+    "${KUBECTL[@]}" create secret generic garden-auth-keys \
+        --from-file=private.pem=<(printf '%s\n' "$private_key") \
+        --from-file=public.pem=<(printf '%s\n' "$public_key")
+    unset private_key public_key
+fi
 "${KUBECTL[@]}" apply -f "$K8S_DIR/postgres.yaml"
 "${KUBECTL[@]}" rollout status deployment/postgres --timeout=180s
 
@@ -50,10 +59,12 @@ printf 'Running database migrations...\n'
 "${KUBECTL[@]}" wait --for=condition=complete job/garden-migrate --timeout=180s
 
 printf 'Rolling out application services...\n'
+"${KUBECTL[@]}" apply -f "$K8S_DIR/auth-service.yaml"
 "${KUBECTL[@]}" apply -f "$K8S_DIR/weather-service.yaml"
 "${KUBECTL[@]}" apply -f "$K8S_DIR/garden-service.yaml"
 # Refresh environment variables even when only the ConfigMap or Secret changed.
-"${KUBECTL[@]}" rollout restart deployment/weather-analyzer deployment/garden-service
+"${KUBECTL[@]}" rollout restart deployment/auth-service deployment/weather-analyzer deployment/garden-service
+"${KUBECTL[@]}" rollout status deployment/auth-service --timeout=180s
 "${KUBECTL[@]}" rollout status deployment/weather-analyzer --timeout=180s
 "${KUBECTL[@]}" rollout status deployment/garden-service --timeout=180s
 "${KUBECTL[@]}" apply -f "$K8S_DIR/frontend.yaml"

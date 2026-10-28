@@ -19,7 +19,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: migrate
-          image: kdkanishka/garden-service:v1
+          image: kdkanishka/garden-service:v2
           imagePullPolicy: IfNotPresent
           command: [alembic, upgrade, head]
           env:

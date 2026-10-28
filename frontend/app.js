@@ -7,8 +7,70 @@
     "plant-form", "plant-fields", "plant-name", "form-title", "save-plant",
     "cancel-edit", "selected-location", "form-status", "form-error",
     "refresh-plants", "list-status", "list-error", "plant-list", "map-status",
+    "login-panel", "login-form", "login-fields", "login-button", "username", "password",
+    "login-status", "login-error", "garden", "session-panel", "signed-in-user", "logout-button",
   ].map(id => [id, document.getElementById(id)]));
   const state = { selected: null, marker: null, map: null, editingId: null, saving: false, loading: false };
+  let token = null;
+  let sessionVersion = 0;
+  let expiryTimer = null;
+  const pendingRequests = new Set();
+
+  function logout(message = "") {
+    sessionVersion += 1;
+    token = null;
+    clearTimeout(expiryTimer);
+    pendingRequests.forEach(controller => controller.abort());
+    pendingRequests.clear();
+    state.loading = false;
+    activeLoad = Promise.resolve();
+    resetForm();
+    setSaving(false);
+    elements["plant-list"].replaceChildren();
+    elements["plant-list"].setAttribute("aria-busy", "false");
+    for (const id of ["form-status", "form-error", "list-status", "list-error", "signed-in-user"]) elements[id].textContent = "";
+    elements.garden.hidden = elements["session-panel"].hidden = true;
+    elements["login-panel"].hidden = false;
+    elements["login-status"].textContent = message;
+    elements["login-error"].textContent = "";
+    elements["password"].value = "";
+    elements.username.focus();
+  }
+
+  async function login(event) {
+    event.preventDefault();
+    const version = sessionVersion;
+    elements["login-fields"].disabled = true;
+    elements["login-status"].textContent = "Logging in…";
+    elements["login-error"].textContent = "";
+    try {
+      const result = await request("/api/auth/login", {
+        method: "POST", body: JSON.stringify({ username: elements.username.value, password: elements.password.value }),
+      }, false);
+      if (version !== sessionVersion) return;
+      if (typeof result.access_token !== "string" || !result.access_token || result.token_type !== "bearer"
+          || !Number.isFinite(result.expires_in) || result.expires_in <= 0 || typeof result.username !== "string") {
+        throw new Error("Login returned an unexpected response. Please try again.");
+      }
+      token = result.access_token;
+      sessionVersion += 1;
+      elements.password.value = "";
+      elements["login-panel"].hidden = true;
+      elements.garden.hidden = elements["session-panel"].hidden = false;
+      elements["signed-in-user"].textContent = `Logged in as ${result.username}`;
+      expiryTimer = setTimeout(() => logout("Session expired. Please log in again."), result.expires_in * 1000);
+      if (!state.map) initializeMap();
+      else state.map.invalidateSize();
+      refreshPlants();
+    } catch (error) {
+      if (version !== sessionVersion) return;
+      elements["login-status"].textContent = "";
+      elements["login-error"].textContent = error.message;
+      elements.password.value = "";
+    } finally {
+      elements["login-fields"].disabled = false;
+    }
+  }
 
   function selectLocation(lat, lon) {
     if (state.saving) return;
@@ -50,13 +112,22 @@
     }
   }
 
-  async function request(path, options = {}) {
+  async function request(path, options = {}, authenticated = true) {
+    if (authenticated && !token) throw new Error("Please log in first.");
+    const version = sessionVersion;
     const controller = new AbortController();
+    pendingRequests.add(controller);
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
       const response = await fetch(path, { ...options, signal: controller.signal, headers: {
         Accept: "application/json", ...(options.body ? { "Content-Type": "application/json" } : {}),
+        ...(authenticated ? { Authorization: `Bearer ${token}` } : {}),
       } });
+      if (version !== sessionVersion) throw new Error("Session changed.");
+      if (authenticated && response.status === 401) {
+        logout("Session expired. Please log in again.");
+        throw new Error("Please log in again.");
+      }
       if (!response.ok) {
         let detail = "";
         try {
@@ -64,7 +135,7 @@
           if (typeof body.detail === "string") detail = body.detail;
           else if (Array.isArray(body.detail)) detail = body.detail.map(item => item.msg).filter(Boolean).join("; ");
         } catch { /* Nginx may return an HTML error page instead of JSON. */ }
-        throw new Error(`Request failed (HTTP ${response.status}). ${detail || "Garden Service may be temporarily unavailable. Please try again."}`);
+        throw new Error(`Request failed (HTTP ${response.status}). ${detail || "Service may be temporarily unavailable. Please try again."}`);
       }
       if (response.status === 204) return null;
       try { return await response.json(); }
@@ -76,7 +147,7 @@
       if (controller.signal.aborted) throw new Error("The request timed out. Refresh the plant list before retrying a change.");
       if (error instanceof TypeError) throw new Error("Cannot reach Garden Service. Check your connection and try again.");
       throw error;
-    } finally { clearTimeout(timer); }
+    } finally { clearTimeout(timer); pendingRequests.delete(controller); }
   }
 
   function validPlant(plant) {
@@ -124,7 +195,8 @@
   }
 
   async function loadPlants() {
-    if (state.loading) return;
+    if (state.loading || !token) return;
+    const version = sessionVersion;
     state.loading = true;
     elements["refresh-plants"].disabled = true;
     elements["plant-list"].setAttribute("aria-busy", "true");
@@ -132,19 +204,23 @@
     elements["list-error"].textContent = "";
     try {
       const plants = await request(API);
+      if (version !== sessionVersion) return;
       if (!Array.isArray(plants) || !plants.every(validPlant)) {
         throw new Error("Garden Service returned an unexpected plant list. Please try refreshing.");
       }
       elements["plant-list"].replaceChildren(...plants.map(renderPlant));
       elements["list-status"].textContent = plants.length ? `${plants.length} plant${plants.length === 1 ? "" : "s"} saved.` : "No plants yet. Add your first plant using the map.";
     } catch (error) {
+      if (version !== sessionVersion) return;
       console.error("Loading plants failed", error);
       elements["list-status"].textContent = "Could not refresh plants. Any plants shown may be out of date.";
       elements["list-error"].textContent = error.message;
     } finally {
-      state.loading = false;
-      elements["refresh-plants"].disabled = state.saving;
-      elements["plant-list"].setAttribute("aria-busy", "false");
+      if (version === sessionVersion) {
+        state.loading = false;
+        elements["refresh-plants"].disabled = state.saving;
+        elements["plant-list"].setAttribute("aria-busy", "false");
+      }
     }
   }
 
@@ -184,7 +260,8 @@
 
   async function savePlant(event) {
     event.preventDefault();
-    if (state.saving) return;
+    if (state.saving || !token) return;
+    const version = sessionVersion;
     elements["form-error"].textContent = "";
     elements["form-status"].textContent = "";
     const name = elements["plant-name"].value.trim();
@@ -205,35 +282,42 @@
       const plant = await request(editing ? `${API}/${state.editingId}` : API, {
         method: editing ? "PATCH" : "POST", body: JSON.stringify({ name, ...state.selected }),
       });
+      if (version !== sessionVersion) return;
       if (!validPlant(plant)) throw new Error("Unexpected save response. Refresh the list before retrying; the plant may have been saved.");
       resetForm();
       elements["form-status"].textContent = editing ? "Plant updated." : "Plant added successfully.";
       // Wait for an in-flight initial/manual read before refreshing after a mutation.
       await activeLoad;
+      if (version !== sessionVersion) return;
       await refreshPlants();
     } catch (error) {
+      if (version !== sessionVersion) return;
       console.error("Saving plant failed", error);
       elements["form-status"].textContent = "";
       elements["form-error"].textContent = `${error.message} Your input has been kept.`;
-    } finally { setSaving(false); }
+    } finally { if (version === sessionVersion) setSaving(false); }
   }
 
   async function deletePlant(plant) {
-    if (state.saving) return;
+    if (state.saving || !token) return;
+    const version = sessionVersion;
     setSaving(true);
     elements["form-error"].textContent = "";
     elements["form-status"].textContent = `Deleting ${plant.name}…`;
     try {
       await request(`${API}/${plant.id}`, { method: "DELETE" });
+      if (version !== sessionVersion) return;
       if (state.editingId === plant.id) resetForm();
       elements["form-status"].textContent = "Plant deleted.";
       await activeLoad;
+      if (version !== sessionVersion) return;
       await refreshPlants();
     } catch (error) {
+      if (version !== sessionVersion) return;
       console.error("Deleting plant failed", error);
       elements["form-status"].textContent = "";
       elements["form-error"].textContent = error.message;
-    } finally { setSaving(false); }
+    } finally { if (version === sessionVersion) setSaving(false); }
   }
 
   let activeLoad = Promise.resolve();
@@ -248,6 +332,6 @@
     elements["form-error"].textContent = "";
     elements["form-status"].textContent = "Edit cancelled.";
   });
-  initializeMap();
-  refreshPlants();
+  elements["login-form"].addEventListener("submit", login);
+  elements["logout-button"].addEventListener("click", () => logout("You have logged out."));
 })();

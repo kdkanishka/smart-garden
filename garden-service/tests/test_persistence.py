@@ -28,11 +28,12 @@ def test_create_commits_and_uses_database_generated_values():
     plant = object()
     session = AsyncMock()
     session.execute.return_value = Mock(scalar_one=Mock(return_value=plant))
-    result = asyncio.run(crud.create_plant(session, PlantCreate(name=" Mint ", lat=1, lon=2)))
+    result = asyncio.run(crud.create_plant(session, PlantCreate(name=" Mint ", lat=1, lon=2), "demo-user-1"))
     assert result is plant
     statement = session.execute.await_args.args[0]
     compiled = statement.compile(dialect=postgresql.dialect())
     assert compiled.params["name"] == "Mint"
+    assert compiled.params["owner_id"] == "demo-user-1"
     assert "created_at" not in compiled.params
     assert "id" not in compiled.params
     assert "RETURNING plants.id" in str(compiled)
@@ -42,7 +43,7 @@ def test_create_commits_and_uses_database_generated_values():
 def test_patch_updates_only_supplied_fields_and_timestamp():
     session = AsyncMock()
     session.execute.return_value = Mock(scalar_one_or_none=Mock(return_value=object()))
-    asyncio.run(crud.update_plant(session, 7, PlantPatch(name=" Rose ")))
+    asyncio.run(crud.update_plant(session, 7, PlantPatch(name=" Rose "), "demo-user-1"))
     statement = session.execute.await_args.args[0]
     compiled = statement.compile(dialect=postgresql.dialect())
     assert compiled.params["name"] == "Rose"
@@ -51,24 +52,34 @@ def test_patch_updates_only_supplied_fields_and_timestamp():
     assert "updated_at=clock_timestamp()" in str(compiled)
     assert "WHERE plants.id =" in str(compiled)
     assert 7 in compiled.params.values()
+    assert "plants.owner_id =" in str(compiled)
+    assert "demo-user-1" in compiled.params.values()
     session.commit.assert_awaited_once()
 
 
-def test_list_orders_by_id_and_get_uses_primary_key():
+def test_list_and_get_filter_by_owner():
     session = AsyncMock()
     session.scalars.return_value = Mock(all=Mock(return_value=["first", "second"]))
-    assert asyncio.run(crud.list_plants(session)) == ["first", "second"]
+    assert asyncio.run(crud.list_plants(session, "demo-user-1")) == ["first", "second"]
     assert "ORDER BY plants.id" in sql(session.scalars.await_args.args[0])
-    asyncio.run(crud.get_plant(session, 7))
-    session.get.assert_awaited_once_with(Plant, 7)
+    statement = session.scalars.await_args.args[0]
+    assert "plants.owner_id =" in sql(statement)
+    assert "demo-user-1" in statement.compile().params.values()
+    asyncio.run(crud.get_plant(session, 7, "demo-user-1"))
+    statement = session.scalar.await_args.args[0]
+    assert "plants.id =" in sql(statement) and "plants.owner_id =" in sql(statement)
+    assert "demo-user-1" in statement.compile().params.values()
 
 
 @pytest.mark.parametrize("deleted_id,expected", [(1, True), (None, False)])
 def test_delete_commits_and_reports_missing_rows(deleted_id, expected):
     session = AsyncMock()
     session.execute.return_value = Mock(scalar_one_or_none=Mock(return_value=deleted_id))
-    assert asyncio.run(crud.delete_plant(session, 1)) is expected
+    assert asyncio.run(crud.delete_plant(session, 1, "demo-user-1")) is expected
     assert "RETURNING plants.id" in sql(session.execute.await_args.args[0])
+    statement = session.execute.await_args.args[0]
+    assert "plants.owner_id =" in sql(statement)
+    assert "demo-user-1" in statement.compile().params.values()
     session.commit.assert_awaited_once()
 
 
@@ -77,7 +88,7 @@ def test_failed_commit_is_not_reported_as_success():
     session.execute.return_value = Mock(scalar_one=Mock(return_value=object()))
     session.commit.side_effect = OperationalError("COMMIT", {}, Exception())
     with pytest.raises(OperationalError):
-        asyncio.run(crud.create_plant(session, PlantCreate(name="Mint", lat=0, lon=0)))
+        asyncio.run(crud.create_plant(session, PlantCreate(name="Mint", lat=0, lon=0), "demo-user-1"))
 
 
 @pytest.mark.parametrize("revision", [[], ["old_revision"], [SCHEMA_REVISION, "other"]])
@@ -94,7 +105,7 @@ def test_readiness_queries_expected_columns():
     session.execute.return_value = Mock(scalars=Mock(return_value=Mock(all=Mock(return_value=[SCHEMA_REVISION]))))
     asyncio.run(check_schema(session))
     statement = sql(session.execute.await_args.args[0])
-    for name in ["id", "name", "lat", "lon", "created_at", "updated_at"]:
+    for name in ["id", "owner_id", "name", "lat", "lon", "created_at", "updated_at"]:
         assert f"plants.{name}" in statement
 
 
@@ -122,6 +133,7 @@ def test_initial_migration_generates_postgresql_ddl_and_downgrade(monkeypatch):
     ddl = output.getvalue()
     for expected in [
         "CREATE TABLE plants", "id SERIAL NOT NULL", "name VARCHAR(100) NOT NULL",
+        "owner_id VARCHAR(100) NOT NULL", "CREATE INDEX ix_plants_owner_id ON plants (owner_id)",
         "lat NUMERIC(8, 6) NOT NULL", "lon NUMERIC(9, 6) NOT NULL",
         "created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL",
         "updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL",

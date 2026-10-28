@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: weather-analyzer
-          image: kdkanishka/weather-analyzer:v1
+          image: kdkanishka/weather-analyzer:v2
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

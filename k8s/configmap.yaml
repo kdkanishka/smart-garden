@@ -6,6 +6,8 @@ metadata:
     app.kubernetes.io/part-of: smart-garden
 data:
   POSTGRES_DB: smart_garden
+  JWT_ISSUER: smart-garden-auth
+  JWT_AUDIENCE: smart-garden
   WEATHER_SERVICE_URL: http://weather-analyzer-svc:80
   WATERING_THRESHOLD_MM: "5.0"
   WEATHER_CACHE_TTL_SECONDS: "300"

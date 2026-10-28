@@ -16,7 +16,27 @@
     <h1>Smart Garden Monitor</h1>
     <p>Save your plants and see forecast-based watering advice for their locations.</p>
   </header>
-  <main>
+  <section id="login-panel" class="panel login-panel" aria-labelledby="login-title">
+    <h2 id="login-title">Log in to your garden</h2>
+    <p>Demo accounts: <strong>demo1 / demo1</strong> or <strong>demo2 / demo2</strong>.</p>
+    <form id="login-form">
+      <fieldset id="login-fields">
+        <label for="username">Username</label>
+        <input id="username" name="username" autocomplete="username" required maxlength="100">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="200">
+        <button id="login-button" type="submit">Log in</button>
+      </fieldset>
+    </form>
+    <p id="login-status" role="status" aria-live="polite"></p>
+    <p id="login-error" class="error" role="alert"></p>
+    <p class="muted">Refreshing the page signs you out. Sessions last 30 minutes.</p>
+  </section>
+  <div id="session-panel" class="session-panel" hidden>
+    <span id="signed-in-user"></span>
+    <button id="logout-button" type="button" class="secondary">Log out</button>
+  </div>
+  <main id="garden" hidden>
     <section class="panel" aria-labelledby="form-title">
       <h2 id="form-title">Add a plant</h2>
       <form id="plant-form" novalidate>
@@ -42,7 +62,7 @@
         <h2 id="plants-title">Your plants</h2>
         <button id="refresh-plants" type="button" class="secondary">Refresh plants</button>
       </div>
-      <p class="muted">A shared garden. Advice uses expected precipitation, including snow as water equivalent.</p>
+      <p class="muted">Only you can access your plants. Advice uses expected precipitation, including snow as water equivalent.</p>
       <p id="list-status" role="status" aria-live="polite"></p>
       <p id="list-error" class="error" role="alert"></p>
       <ul id="plant-list" class="plant-list" aria-label="Saved plants"></ul>

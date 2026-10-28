@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy.exc import OperationalError, TimeoutError as DatabaseTimeout
 
 import main
+from auth import current_user
 from database import get_session
 from models import Plant
 
@@ -20,6 +21,7 @@ def api():
         yield session
 
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[current_user] = lambda: "demo-user-1"
     app.state.weather_client = AsyncMock(fetch=AsyncMock(return_value=None))
     # No lifespan or actual database; route collaborators are mocked in each test.
     return TestClient(app), session
@@ -54,6 +56,7 @@ def test_stored_plant_response(api, plant, monkeypatch, method, path, operation,
         expected.update(weather_status="unavailable", weather=None)
     assert response.json() == expected
     assert persistence.await_args.args[0] is session
+    assert persistence.await_args.args[-1] == "demo-user-1"
 
 
 def test_list_and_delete(api, plant, monkeypatch):
@@ -65,7 +68,7 @@ def test_list_and_delete(api, plant, monkeypatch):
     response = client.delete("/plants/1")
     assert response.status_code == 204
     assert response.content == b""
-    delete.assert_awaited_once_with(session, 1)
+    delete.assert_awaited_once_with(session, 1, "demo-user-1")
 
 
 @pytest.mark.parametrize("method,operation,result", [
@@ -87,6 +90,8 @@ def test_unknown_ids_return_404(api, monkeypatch, method, operation, result):
     ("patch", {}), ("patch", {"name": None}), ("patch", {"lat": None}),
     ("patch", {"lon": None}), ("patch", {"extra": 1}),
     ("patch", {"lat": "90.00000001"}), ("patch", {"name": "  "}),
+    ("post", {"name": "Mint", "lat": 0, "lon": 0, "owner_id": "demo-user-2"}),
+    ("patch", {"owner_id": "demo-user-2"}),
 ])
 def test_validation_returns_fastapi_422_before_persistence(api, monkeypatch, method, data):
     client, _ = api

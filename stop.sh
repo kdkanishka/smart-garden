@@ -22,6 +22,7 @@ fi
 printf 'Removing Smart Garden services and workloads...\n'
 "${KUBECTL[@]}" delete \
     -f "$K8S_DIR/frontend.yaml" \
+    -f "$K8S_DIR/auth-service.yaml" \
     -f "$K8S_DIR/garden-service.yaml" \
     -f "$K8S_DIR/weather-service.yaml" \
     -f "$K8S_DIR/migration-job.yaml" \
@@ -31,6 +32,7 @@ printf 'Removing Smart Garden services and workloads...\n'
 "${KUBECTL[@]}" delete service postgres-svc --ignore-not-found=true --wait=true --timeout=180s
 "${KUBECTL[@]}" delete configmap garden-config --ignore-not-found=true --wait=true --timeout=180s
 "${KUBECTL[@]}" delete secret garden-db-secret --ignore-not-found=true --wait=true --timeout=180s
+"${KUBECTL[@]}" delete secret garden-auth-keys --ignore-not-found=true --wait=true --timeout=180s
 
 printf 'Waiting for Smart Garden pods to terminate...\n'
 "${KUBECTL[@]}" wait --for=delete pod \

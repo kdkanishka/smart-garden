@@ -15,3 +15,6 @@ htmlcov/
 .env.*
 !.env.example
 /k8s/secret.yaml
+
+#intellij
+.idea
