@@ -89,7 +89,7 @@ returns plants with `weather_status: "unavailable"`; mutations still work.
 
 ## Tests and local development
 
-Use Python 3.12+ in a virtual environment:
+Use Python 3.12+ in a virtual environment(I prefer venv):
 
 ```bash
 python -m pip install -r auth-service/requirements-dev.txt -r garden-service/requirements-dev.txt
@@ -102,42 +102,3 @@ python -m pytest -c weather-service/pytest.ini weather-service/tests
 Garden's database integration tests run only when `TEST_DATABASE_URL` names a
 disposable PostgreSQL database ending in `_test`. They migrate and clear that
 database and verify isolation between users.
-
-For local services, generate keys outside the repository:
-
-```bash
-openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/garden-private.pem
-openssl pkey -in /tmp/garden-private.pem -pubout -out /tmp/garden-public.pem
-export JWT_PRIVATE_KEY="$(< /tmp/garden-private.pem)"
-export JWT_PUBLIC_KEY="$(< /tmp/garden-public.pem)"
-export DATABASE_URL='postgresql+psycopg://USER:PASSWORD@localhost:5432/smart_garden'
-python -m alembic -c garden-service/alembic.ini upgrade head
-```
-
-In separate terminals with those environment variables, launch Auth on port
-8002, Garden on 8001, and Weather on 8000:
-
-```bash
-python -m uvicorn main:app --app-dir auth-service --port 8002
-WEATHER_SERVICE_URL=http://localhost:8000 python -m uvicorn main:app --app-dir garden-service --port 8001
-python -m uvicorn main:app --app-dir weather-service --port 8000
-```
-
-For the frontend container, set `GARDEN_SERVICE_HOST`/`PORT` and
-`AUTH_SERVICE_HOST`/`PORT` to addresses reachable from that container.
-
-## Acceptance checks
-
-1. Log in as `demo1`, create a plant, log out, and log in as `demo2`. The plant
-   must be absent. Its direct GET/PATCH/DELETE requests must return `404`.
-2. Create a different plant as `demo2`; log back in as `demo1` and verify that
-   only the first plant appears. Refresh and verify that login is required.
-3. Check invalid credentials, token expiry, and a missing/modified token.
-   Logout must clear the list, form, and selected marker, including during requests.
-4. Confirm same-origin API requests carry Bearer tokens but map tile requests do
-   not. Verify create/edit/delete and weather-unavailable behavior.
-5. Check `kubectl get deployments,pods,services,pvc`: Frontend/Auth/Garden/Weather/
-   PostgreSQL use `2/2/2/3/1` replicas. Only the frontend uses a NodePort.
-
-This demo uses HTTP and intentionally simple demo passwords. PostgreSQL has one
-replica and a 1 GiB PVC; persistence is not high availability or backup.
